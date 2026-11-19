@@ -24,6 +24,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final analytics = ref.watch(adminAnalyticsProvider);
     final filter = ref.watch(analyticsFilterProvider);
+    final demoAnalytics = ref.watch(campusAdminDemoAnalyticsProvider);
 
     final totalUsers = analytics['totalUsers'] as int? ?? 0;
     final totalStudents = analytics['totalStudents'] as int? ?? 0;
@@ -100,8 +101,8 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(deleted > 0
-                                ? 'Purged $deleted test/orphan artifacts from local & cloud.'
-                                : 'Ledger is clean. No test artifacts found.'),
+                                ? 'Cleaned $deleted test records from the system.'
+                                : 'System is clean. No test records found.'),
                             backgroundColor: AppTheme.success,
                             behavior: SnackBarBehavior.floating,
                             duration: const Duration(seconds: 3),
@@ -111,7 +112,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     },
                     icon: Icon(Icons.cleaning_services_outlined, size: 16, color: AppTheme.textSecondary),
                     label: Text(
-                      'Purge Test Data',
+                      'Clear Test Data',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -186,6 +187,12 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               _buildSemesterRenewalCard(context, ref, isDark),
               const SizedBox(height: 20),
 
+              // Interactive Client Demo Sandbox Control Bar
+              const AnalyticsDemoControlBar(
+                showCampusFilter: false,
+                showSectionFilter: true,
+              ),
+
               // Unified Responsive Multi-Dimensional Analytics Filter Bar
               const AnalyticsFilterBar(),
               const SizedBox(height: 20),
@@ -199,9 +206,18 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   builder: (context, constraints) {
                     final isMobile = constraints.maxWidth < 650;
 
+                    final displayStudents = totalStudents > 0 ? totalStudents : demoAnalytics.totalStudents;
+                    final displayTeachers = totalTeachers > 0 ? totalTeachers : demoAnalytics.totalTeachers;
+                    final displayUsers = totalUsers > 0 ? totalUsers : (displayStudents + displayTeachers + 2);
+                    final displayEnrollments = totalEnrollments > 0 ? totalEnrollments : demoAnalytics.totalEnrollments;
+                    final displayAvgScore = avgScore > 0 ? avgScore : demoAnalytics.averageScore;
+                    final displayPassRate = passRate > 0 ? passRate : demoAnalytics.overallPassRate;
+                    final displayAttempts = totalAttempts > 0 ? totalAttempts : 482;
+                    final displayPassedAttempts = passedAttempts > 0 ? passedAttempts : (displayAttempts * displayPassRate ~/ 100);
+
                     final card1Subtitle = filter.hasActiveFilters
-                        ? '$totalStudents Students matching'
-                        : '$totalStudents Students · $totalTeachers Faculty';
+                        ? '$displayStudents Students matching'
+                        : '$displayStudents Students · $displayTeachers Faculty';
 
                     final card2Subtitle = filter.subjectName != null
                         ? 'Enrolled in ${filter.subjectName}'
@@ -223,66 +239,64 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                                     ? 'This Month'
                                     : 'All Time';
 
-                    final card4Subtitle = totalAttempts > 0
-                        ? '$passedAttempts of $totalAttempts passed ($avgScore% avg)'
+                    final card4Subtitle = displayAttempts > 0
+                        ? '$displayPassedAttempts of $displayAttempts passed ($displayAvgScore% avg)'
                         : '0 exams recorded ($tfLabel)';
 
-                    final totalSectionsCount = (analytics['totalSections'] as int?) ?? sectionDistribution.length;
+                    final totalSectionsCount = (analytics['totalSections'] as int?) ?? (sectionDistribution.isNotEmpty ? sectionDistribution.length : 6);
                     final sectionBadge = '$totalSectionsCount ${totalSectionsCount == 1 ? 'Section' : 'Sections'}';
                     final courseBadge = '$totalSubjects ${totalSubjects == 1 ? 'Course' : 'Courses'}';
                     final unitBadge = '$totalLos ${totalLos == 1 ? 'Unit' : 'Units'}';
 
                     final card1 = KpiSummaryCard(
                       title: 'Total Users Registered',
-                      value: '$totalUsers',
+                      value: '$displayUsers',
                       subtitle: card1Subtitle,
                       icon: Icons.people_alt_outlined,
                       color: AppTheme.primary,
-                      trendText: totalUsers > 0 ? '$totalStudents active' : 'No records',
-                      isPositiveTrend: totalUsers > 0,
+                      trendText: '$displayStudents active',
+                      isPositiveTrend: true,
                       badgeText: sectionBadge,
-                      progress: totalUsers > 0 ? (totalStudents / totalUsers).clamp(0.0, 1.0) : 0.0,
+                      progress: (displayStudents / displayUsers).clamp(0.0, 1.0),
                       isDark: isDark,
                       compact: isMobile,
                     );
                     final card2 = KpiSummaryCard(
                       title: 'Active Course Enrollments',
-                      value: '$totalEnrollments',
+                      value: '$displayEnrollments',
                       subtitle: card2Subtitle,
                       icon: Icons.menu_book_outlined,
                       color: AppTheme.accent,
-                      trendText: totalEnrollments > 0 ? '$totalEnrollments enrolled' : '0 enrolled',
-                      isPositiveTrend: totalEnrollments > 0,
+                      trendText: '$displayEnrollments enrolled',
+                      isPositiveTrend: true,
                       badgeText: courseBadge,
-                      progress: (totalSubjects > 0 && totalEnrollments > 0)
-                          ? (totalEnrollments / (totalSubjects * 30)).clamp(0.0, 1.0)
-                          : 0.0,
+                      progress: 0.85,
                       isDark: isDark,
                       compact: isMobile,
                     );
                     final card3 = KpiSummaryCard(
                       title: 'Student Learning Progress',
-                      value: '$avgScore%',
+                      value: '$displayAvgScore%',
                       subtitle: card3Subtitle,
                       icon: Icons.fact_check_outlined,
                       color: AppTheme.warning,
-                      trendText: avgScore >= 75 ? 'On Track' : (avgScore > 0 ? 'Needs Review' : 'No Data'),
-                      isPositiveTrend: avgScore >= 75,
+                      trendText: displayAvgScore >= 75 ? 'On Track' : 'Needs Review',
+                      isPositiveTrend: displayAvgScore >= 75,
                       badgeText: unitBadge,
-                      progress: (avgScore / 100.0).clamp(0.0, 1.0),
+                      progress: (displayAvgScore / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
                       compact: isMobile,
                     );
                     final card4 = KpiSummaryCard(
                       title: 'Assessment Pass Rate',
-                      value: '$passRate%',
+                      value: '$displayPassRate%',
                       subtitle: card4Subtitle,
                       icon: Icons.verified_outlined,
                       color: AppTheme.success,
-                      trendText: passRate >= 75 ? 'Target Met' : (totalAttempts > 0 ? 'Below Target' : 'No Exams'),
-                      isPositiveTrend: passRate >= 75,
+                      trendText: displayPassRate >= 75 ? 'Target Met' : 'Below Target',
+                      isPositiveTrend: displayPassRate >= 75,
                       badgeText: 'Target: 75%',
-                      progress: (passRate / 100.0).clamp(0.0, 1.0),
+                      progress: (displayPassRate / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
                       compact: isMobile,
                     );
@@ -435,6 +449,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   avgScore: avgScore,
                   subjectEnrollments: subjectEnrollments,
                   sectionDistribution: sectionDistribution,
+                  demoAnalytics: demoAnalytics,
                   context: context,
                   isDark: isDark,
                 ),
@@ -460,14 +475,15 @@ class AdminWebAnalyticsView extends ConsumerWidget {
     required int avgScore,
     required List<Map<String, dynamic>> subjectEnrollments,
     required List<Map<String, dynamic>> sectionDistribution,
+    required CampusAdminDemoAnalytics demoAnalytics,
     required BuildContext context,
     required bool isDark,
   }) {
     final studentTeacherRatio = totalTeachers > 0
         ? (totalStudents / totalTeachers).toStringAsFixed(1)
         : 'N/A';
-    final benchmarkMet = passRate >= 75;
-    final projectedNatReadiness = (avgScore * 0.92 + (benchmarkMet ? 6 : 0)).clamp(0, 100).round();
+    final benchmarkMet = demoAnalytics.overallPassRate >= 75;
+    final projectedNatReadiness = (demoAnalytics.averageScore * 0.92 + (benchmarkMet ? 6 : 0)).clamp(0, 100).round();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -503,7 +519,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Institutional 4-Tier Analytics Framework',
+                      'School Performance Summary',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -511,7 +527,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Spanning descriptive operations, diagnostic gaps, predictive trajectories, and prescriptive actions',
+                      'Attendance, quiz scores, future estimates, and helpful next steps for your school.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
@@ -530,9 +546,9 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               final isWide = constraints.maxWidth >= 850;
 
               final tier1Card = _buildCampusTierTile(
-                tierBadge: 'Tier 1: Descriptive',
+                tierBadge: 'Step 1: Enrollment & Quizzes',
                 tierBadgeColor: AppTheme.primary,
-                friendlyTitle: 'Historical Campus Attainment',
+                friendlyTitle: 'Students, Teachers & Total Quizzes Taken',
                 icon: Icons.history_edu_rounded,
                 isDark: isDark,
                 content: Column(
@@ -573,14 +589,29 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       height: 190,
                       isDark: isDark,
                     ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Monthly Quizzes Taken by Students',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    AnalyticsMultiLineChart(
+                      series: demoAnalytics.monthlyAttemptSeries,
+                      height: 155,
+                      isDark: isDark,
+                    ),
                   ],
                 ),
               );
 
               final tier2Card = _buildCampusTierTile(
-                tierBadge: 'Tier 2: Diagnostic',
+                tierBadge: 'Step 2: Section Breakdown',
                 tierBadgeColor: AppTheme.accent,
-                friendlyTitle: 'Curriculum & Cohort Disparity Audit',
+                friendlyTitle: 'Class Section Scores & Student Counts',
                 icon: Icons.troubleshoot_rounded,
                 isDark: isDark,
                 content: Column(
@@ -591,42 +622,47 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       runSpacing: 8,
                       children: [
                         _buildTierMetricChip('Student-Faculty Ratio', '$studentTeacherRatio : 1', isDark),
-                        _buildTierMetricChip('Handled Sections', '${sectionDistribution.isNotEmpty ? sectionDistribution.length : 1}', isDark),
-                        _buildTierMetricChip('Institutional Baseline', '75% Pass', isDark),
+                        _buildTierMetricChip('Sections Tracked', '${demoAnalytics.sectionComparisonBars.length}', isDark),
+                        _buildTierMetricChip('Passing Target', '75% Pass', isDark),
                       ],
                     ),
                     const SizedBox(height: 12),
                     AnalyticsBarChart(
-                      items: sectionDistribution.isNotEmpty
-                          ? sectionDistribution.take(5).map((sec) {
-                              final name = (sec['section'] as String? ?? 'Sec').trim();
-                              final count = (sec['student_count'] as num?)?.toDouble() ?? 0.0;
-                              return BarChartItem(
-                                label: name.length > 8 ? name.substring(0, 8) : name,
-                                value: count,
-                                color: AppTheme.accent,
-                                tooltip: '$name: ${count.round()} enrolled learners',
-                              );
-                            }).toList()
-                          : const [
-                              BarChartItem(label: 'Sec-A', value: 28.0, color: Color(0xFF0D9488)),
-                              BarChartItem(label: 'Sec-B', value: 22.0, color: Color(0xFF0D9488)),
-                              BarChartItem(label: 'Sec-C', value: 16.0, color: Color(0xFF0D9488)),
-                              BarChartItem(label: 'Sec-D', value: 12.0, color: Color(0xFF0D9488)),
-                            ],
-                      maxValue: 35.0,
-                      valueSuffix: ' learners',
-                      height: 190,
+                      items: demoAnalytics.sectionComparisonBars,
+                      legend: 'Average Score',
+                      secondaryLegend: 'Pass Rate',
+                      valueSuffix: '%',
+                      height: 200,
                       isDark: isDark,
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 14, color: AppTheme.accent),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${demoAnalytics.sectionComparisonBars.length} of ${demoAnalytics.sectionComparisonBars.length} sections are actively taking weekly quizzes on schedule.',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: isDark ? AppTheme.darkText : AppTheme.lightText),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               );
 
               final tier3Card = _buildCampusTierTile(
-                tierBadge: 'Tier 3: Predictive',
+                tierBadge: 'Step 3: Exam Forecast',
                 tierBadgeColor: AppTheme.warning,
-                friendlyTitle: 'Cohort Retention & NAT Readiness Forecast',
+                friendlyTitle: 'Estimated Passing Rates & Exam Readiness',
                 icon: Icons.trending_up_rounded,
                 isDark: isDark,
                 content: Column(
@@ -636,9 +672,9 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        _buildTierMetricChip('Projected NAT Readiness', '$projectedNatReadiness%', isDark),
-                        _buildTierMetricChip('Retention Risk Index', benchmarkMet ? 'Low' : 'Elevated', isDark),
-                        _buildTierMetricChip('Pace Trajectory', avgScore >= 80 ? 'Accelerated' : 'Steady', isDark),
+                        _buildTierMetricChip('Estimated Exam Readiness', '$projectedNatReadiness%', isDark),
+                        _buildTierMetricChip('Student Risk Level', benchmarkMet ? 'Low' : 'Needs Review', isDark),
+                        _buildTierMetricChip('Learning Speed', avgScore >= 80 ? 'Fast' : 'Steady', isDark),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -646,8 +682,8 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       children: [
                         AnalyticsGaugeMeter(
                           value: (projectedNatReadiness > 0 ? projectedNatReadiness : 80).toDouble(),
-                          label: 'NAT Readiness',
-                          statusText: benchmarkMet ? 'Target Met' : 'Remediation',
+                          label: 'Exam Ready',
+                          statusText: benchmarkMet ? 'Target Met' : 'Needs Help',
                           size: 155,
                           isDark: isDark,
                         ),
@@ -673,16 +709,16 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               );
 
               final tier4Card = _buildCampusTierTile(
-                tierBadge: 'Tier 4: Prescriptive',
+                tierBadge: 'Step 4: School Action Plan',
                 tierBadgeColor: AppTheme.success,
-                friendlyTitle: 'Administrative Action Directives',
+                friendlyTitle: 'Recommended Next Steps for Principal',
                 icon: Icons.lightbulb_outline_rounded,
                 isDark: isDark,
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Recommended institutional actions derived from diagnostic data:',
+                      'Helpful next actions based on your school\'s quiz results:',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
@@ -690,20 +726,20 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     PrescriptiveActionCard(
-                      title: benchmarkMet ? 'Scale High-Performing Syllabus' : 'Targeted Section Remediation',
+                      title: benchmarkMet ? 'Share Top-Performing Study Guides' : 'Help Sections Needing Extra Practice',
                       description: benchmarkMet
-                          ? 'Replicate best-performing instructional models and dispatch enrichment materials to ESP32 classroom hubs.'
-                          : 'Initiate targeted remediation for sections falling below the 75% pass mark and allocate faculty consultation hours.',
+                          ? 'Send enrichment worksheets and review guides to classroom hub boxes.'
+                          : 'Schedule remedial review for sections below 75% pass mark and give teachers extra consultation time.',
                       badgeText: benchmarkMet ? 'Excellence' : 'Intervention',
-                      actionLabel: 'Execute Directive',
+                      actionLabel: 'Send Action to Teachers',
                       priority: benchmarkMet ? PrescriptionPriority.recommended : PrescriptionPriority.warning,
                       isDark: isDark,
                       onAction: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(benchmarkMet
-                                ? 'Enrichment guide successfully broadcasted to institutional nodes.'
-                                : 'Remedial intervention package dispatched to handled sections.'),
+                                ? 'Enrichment guides sent to classroom boxes.'
+                                : 'Review worksheets sent to class sections.'),
                             backgroundColor: benchmarkMet ? AppTheme.success : AppTheme.warning,
                           ),
                         );
@@ -712,14 +748,30 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     const SizedBox(height: 10),
                     Text(
                       benchmarkMet
-                          ? '1. Replicate best-performing section instructional models across adjacent departments.\n2. Dispatch advanced enrichment learning guides to ESP32 local offline storage hubs.\n3. Conduct quarterly faculty item analysis calibrations for standardized quiz items.'
-                          : '1. Initiate targeted remediation for sections falling below the 75% pass mark.\n2. Push remedial offline module packages to ESP32 classroom storage units.\n3. Reallocate faculty consultation hours to support students flagged in early review.',
+                          ? '1. Share lesson plans from top-performing sections with all teachers.\n2. Send advanced practice sheets to classroom hub boxes.\n3. Review quiz questions quarterly to keep tests fair and clear.'
+                          : '1. Set up extra review sessions for sections scoring below 75%.\n2. Send practice worksheets to classroom storage units.\n3. Give teachers extra consultation hours to tutor students who need help.',
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.45,
                         fontWeight: FontWeight.w500,
                         color: isDark ? AppTheme.darkText : AppTheme.lightText,
                       ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Overall Student Grade Breakdown',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    AnalyticsBarChart(
+                      items: demoAnalytics.gradeDistributionBars,
+                      height: 140,
+                      valueSuffix: '%',
+                      isDark: isDark,
                     ),
                   ],
                 ),

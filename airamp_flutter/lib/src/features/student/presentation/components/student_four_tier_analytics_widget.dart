@@ -22,18 +22,23 @@ class _StudentFourTierAnalyticsWidgetState
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final analytics = ref.watch(studentFourTierAnalyticsProvider);
+    final demoStudent = ref.watch(studentDemoAnalyticsProvider);
 
-    final passRate = (analytics['passRate'] as num?)?.toDouble() ?? 0.0;
-    final avgScore = (analytics['avgScore'] as num?)?.toDouble() ?? 0.0;
-    final totalAttempts = (analytics['totalAttempts'] as num?)?.toInt() ?? 0;
-    final passedAttempts = (analytics['passedAttempts'] as num?)?.toInt() ?? 0;
+    final rawPassRate = (analytics['passRate'] as num?)?.toDouble() ?? 0.0;
+    final passRate = rawPassRate > 0 ? rawPassRate : demoStudent.overallGrade.toDouble();
+    final rawAvgScore = (analytics['avgScore'] as num?)?.toDouble() ?? 0.0;
+    final avgScore = rawAvgScore > 0 ? rawAvgScore : demoStudent.overallGrade.toDouble();
+    final rawTotalAttempts = (analytics['totalAttempts'] as num?)?.toInt() ?? 0;
+    final totalAttempts = rawTotalAttempts > 0 ? rawTotalAttempts : demoStudent.completedQuizzes;
+    final rawPassedAttempts = (analytics['passedAttempts'] as num?)?.toInt() ?? 0;
+    final passedAttempts = rawPassedAttempts > 0 ? rawPassedAttempts : (totalAttempts * (passRate / 100)).round();
     final totalLos = (analytics['totalLos'] as num?)?.toInt() ?? 4;
-    final completedLos = (analytics['completedLos'] as num?)?.toInt() ?? 0;
+    final completedLos = (analytics['completedLos'] as num?)?.toInt() ?? (passRate >= 75 ? 3 : 2);
     final loCompletionRate =
         (analytics['loCompletionRate'] as num?)?.toInt() ??
-        (totalLos > 0 ? ((completedLos / totalLos) * 100).round() : 25);
-    final onTimeSubs = (analytics['onTimeSubmissions'] as num?)?.toInt() ?? 0;
-    final totalSubs = (analytics['totalSubmissions'] as num?)?.toInt() ?? 0;
+        (totalLos > 0 ? ((completedLos / totalLos) * 100).round() : 75);
+    final onTimeSubs = (analytics['onTimeSubmissions'] as num?)?.toInt() ?? (passRate >= 75 ? 8 : 4);
+    final totalSubs = (analytics['totalSubmissions'] as num?)?.toInt() ?? (passRate >= 75 ? 9 : 7);
 
     final subjectAttainments =
         (analytics['subjectAttainments'] as List<dynamic>?)
@@ -52,10 +57,10 @@ class _StudentFourTierAnalyticsWidgetState
             ?.cast<Map<String, dynamic>>() ??
         [];
 
-    final projectedScore =
-        (analytics['projectedScore'] as num?)?.toDouble() ?? 80.0;
-    final gradeLetter = analytics['gradeLetter'] as String? ?? 'B';
-    final riskLevel = analytics['riskLevel'] as String? ?? 'Low Risk';
+    final rawProjected = (analytics['projectedScore'] as num?)?.toDouble() ?? 0.0;
+    final projectedScore = rawProjected > 0 ? rawProjected : demoStudent.overallGrade.toDouble();
+    final gradeLetter = analytics['gradeLetter'] as String? ?? (projectedScore >= 90 ? 'A' : (projectedScore >= 80 ? 'B' : (projectedScore >= 75 ? 'C' : 'D')));
+    final riskLevel = analytics['riskLevel'] as String? ?? (projectedScore >= 75 ? 'Low Risk' : 'High Risk');
 
     final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
@@ -139,6 +144,61 @@ class _StudentFourTierAnalyticsWidgetState
           ),
           SizedBox(height: isCompactScreen ? 14 : 20),
 
+          // Interactive Client Demo Sandbox Control Bar
+          const AnalyticsDemoControlBar(
+            showCampusFilter: false,
+            showSectionFilter: false,
+            showSubjectFilter: true,
+          ),
+
+          // Student Study Streak & Upcoming Milestone Callout
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: cyanColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cyanColor.withValues(alpha: 0.25)),
+            ),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(
+                      '3 Quizzes Passed in a row!',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppTheme.darkTextBright : AppTheme.lightTextBright,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('📅', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Next: General Math Quiz on Friday • 80% prepared',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
           // ── 4-Tier Grid ──
           LayoutBuilder(
             builder: (context, constraints) {
@@ -205,41 +265,43 @@ class _StudentFourTierAnalyticsWidgetState
                 const Color(0xFF84CC16),
               ];
 
+              final gradeFactor = demoStudent.overallGrade / 82.0;
+
               final defaultCurriculum = [
                 {
                   'name': 'Oral Communication in Context',
                   'code': 'CORE-01',
-                  'avgScore': 82.0,
+                  'avgScore': (82.0 * gradeFactor).clamp(40.0, 98.0),
                   'totalLos': 4,
-                  'completedLos': 3,
+                  'completedLos': (3 * gradeFactor).round().clamp(1, 4),
                 },
                 {
                   'name': 'Reading and Writing Skills',
                   'code': 'CORE-02',
-                  'avgScore': 86.0,
+                  'avgScore': (86.0 * gradeFactor).clamp(40.0, 99.0),
                   'totalLos': 4,
-                  'completedLos': 4,
+                  'completedLos': (4 * gradeFactor).round().clamp(1, 4),
                 },
                 {
                   'name': 'General Mathematics',
                   'code': 'CORE-03',
-                  'avgScore': 74.0,
+                  'avgScore': (74.0 * gradeFactor).clamp(35.0, 96.0),
                   'totalLos': 4,
-                  'completedLos': 2,
+                  'completedLos': (2 * gradeFactor).round().clamp(1, 4),
                 },
                 {
                   'name': 'Earth and Life Science',
                   'code': 'CORE-04',
-                  'avgScore': 88.0,
+                  'avgScore': (88.0 * gradeFactor).clamp(40.0, 99.0),
                   'totalLos': 4,
-                  'completedLos': 3,
+                  'completedLos': (3 * gradeFactor).round().clamp(1, 4),
                 },
                 {
                   'name': 'Physical Science & Inquiry',
                   'code': 'CORE-05',
-                  'avgScore': 78.0,
+                  'avgScore': (78.0 * gradeFactor).clamp(38.0, 95.0),
                   'totalLos': 4,
-                  'completedLos': 2,
+                  'completedLos': (2 * gradeFactor).round().clamp(1, 4),
                 },
               ];
 
@@ -283,12 +345,12 @@ class _StudentFourTierAnalyticsWidgetState
                   (bloomsProfile.isNotEmpty
                           ? bloomsProfile
                           : [
-                              {'label': 'Remembering', 'value': 80.0},
-                              {'label': 'Understanding', 'value': 75.0},
-                              {'label': 'Applying', 'value': 70.0},
-                              {'label': 'Analyzing', 'value': 65.0},
-                              {'label': 'Evaluating', 'value': 60.0},
-                              {'label': 'Creating', 'value': 58.0},
+                              {'label': 'Recalling Facts', 'value': (80.0 * gradeFactor).clamp(40.0, 98.0)},
+                              {'label': 'Understanding Lessons', 'value': (75.0 * gradeFactor).clamp(40.0, 96.0)},
+                              {'label': 'Solving Problems', 'value': (70.0 * gradeFactor).clamp(35.0, 95.0)},
+                              {'label': 'Connecting Ideas', 'value': (65.0 * gradeFactor).clamp(35.0, 92.0)},
+                              {'label': 'Checking & Judging', 'value': (60.0 * gradeFactor).clamp(30.0, 90.0)},
+                              {'label': 'Creative Projects', 'value': (58.0 * gradeFactor).clamp(30.0, 88.0)},
                             ])
                       .map((b) {
                         return RadarDimension(
@@ -414,12 +476,12 @@ class _StudentFourTierAnalyticsWidgetState
                     : AnalyticsRadarChart(
                         dimensions: radarDims,
                         secondaryDimensions: const [
-                          RadarDimension(label: 'Remembering', value: 75.0),
-                          RadarDimension(label: 'Understanding', value: 75.0),
-                          RadarDimension(label: 'Applying', value: 75.0),
-                          RadarDimension(label: 'Analyzing', value: 75.0),
-                          RadarDimension(label: 'Evaluating', value: 75.0),
-                          RadarDimension(label: 'Creating', value: 75.0),
+                          RadarDimension(label: 'Recalling Facts', value: 75.0),
+                          RadarDimension(label: 'Understanding Lessons', value: 75.0),
+                          RadarDimension(label: 'Solving Problems', value: 75.0),
+                          RadarDimension(label: 'Connecting Ideas', value: 75.0),
+                          RadarDimension(label: 'Checking & Judging', value: 75.0),
+                          RadarDimension(label: 'Creative Projects', value: 75.0),
                         ],
                         size: isWide ? 210 : 160,
                         isDark: isDark,
@@ -432,22 +494,16 @@ class _StudentFourTierAnalyticsWidgetState
               );
 
               // ── TIER 3: PREDICTIVE ──
-              final trendPoints =
-                  (trajectoryPoints.isNotEmpty
-                          ? trajectoryPoints
-                          : [
-                              {'label': 'W1', 'value': 74.0},
-                              {'label': 'W2', 'value': 78.0},
-                              {'label': 'Midterm', 'value': 82.0},
-                              {'label': 'Forecast', 'value': 85.0},
-                            ])
-                      .map((tp) {
-                        return TrendPoint(
-                          label: tp['label'] as String? ?? '',
-                          value: (tp['value'] as num?)?.toDouble() ?? 75.0,
-                        );
-                      })
-                      .toList();
+              final trendPoints = (trajectoryPoints.isNotEmpty
+                      ? trajectoryPoints
+                      : demoStudent.myScoreHistory.map((p) => {'label': p.label, 'value': p.value}).toList())
+                  .map((tp) {
+                    return TrendPoint(
+                      label: tp['label'] as String? ?? '',
+                      value: (tp['value'] as num?)?.toDouble() ?? 75.0,
+                    );
+                  })
+                  .toList();
 
               final friendlyRiskStatus = riskLevel.contains('Low')
                   ? 'Safe to Pass ✅'
@@ -588,35 +644,65 @@ class _StudentFourTierAnalyticsWidgetState
               );
 
               // ── TIER 4: PRESCRIPTIVE ──
-              final fallbackDirectives = [
-                {
-                  'title': '📝 Take Waiting Quiz',
-                  'description':
-                      'You have quizzes ready in your class section. Complete them now to raise your expected grade!',
-                  'badge': '⚡ Due Soon',
-                  'priority': 'critical',
-                  'actionLabel': 'Start Quiz',
-                  'actionType': 'start_quiz',
-                },
-                {
-                  'title': '📖 Read Next Lesson Modules',
-                  'description':
-                      'Advance your lesson topics to prepare for upcoming tests and quarterly exams.',
-                  'badge': '📖 Lessons',
-                  'priority': 'recommended',
-                  'actionLabel': 'Open Lessons',
-                  'actionType': 'open_modules',
-                },
-                {
-                  'title': '💾 Download Offline Study Packs',
-                  'description':
-                      'Save lesson flashcards and study packs from your classroom hub box so you can study offline at home.',
-                  'badge': '💾 Offline',
-                  'priority': 'routine',
-                  'actionLabel': 'Download Files',
-                  'actionType': 'open_hub',
-                },
-              ];
+              final fallbackDirectives = demoStudent.overallGrade < 75
+                  ? [
+                      {
+                        'title': '🚨 Urgent: Retake General Mathematics Quiz',
+                        'description':
+                            'Your average in General Math is below the 75% passing threshold. Take the remedial quiz window to lift your standing.',
+                        'badge': '⚡ High Priority',
+                        'priority': 'critical',
+                        'actionLabel': 'Start Retake',
+                        'actionType': 'start_quiz',
+                      },
+                      {
+                        'title': '📖 Review Polynomial Factoring Flashcards',
+                        'description':
+                            'Study the Topic 3 summary cards downloaded from your classroom hub node.',
+                        'badge': '📖 Flashcards',
+                        'priority': 'warning',
+                        'actionLabel': 'Open Flashcards',
+                        'actionType': 'open_modules',
+                      },
+                      {
+                        'title': '💾 Synchronize Offline Study Pack',
+                        'description':
+                            'Connect to your classroom ESP32 hub box to get updated practice worksheets.',
+                        'badge': '💾 Offline Hub',
+                        'priority': 'routine',
+                        'actionLabel': 'Download Files',
+                        'actionType': 'open_hub',
+                      },
+                    ]
+                  : [
+                      {
+                        'title': '📝 Take Waiting Quiz',
+                        'description':
+                            'You have quizzes ready in your class section. Complete them now to raise your expected grade!',
+                        'badge': '⚡ Due Soon',
+                        'priority': 'critical',
+                        'actionLabel': 'Start Quiz',
+                        'actionType': 'start_quiz',
+                      },
+                      {
+                        'title': '📖 Read Next Lesson Modules',
+                        'description':
+                            'Advance your lesson topics to prepare for upcoming tests and quarterly exams.',
+                        'badge': '📖 Lessons',
+                        'priority': 'recommended',
+                        'actionLabel': 'Open Lessons',
+                        'actionType': 'open_modules',
+                      },
+                      {
+                        'title': '💾 Download Offline Study Packs',
+                        'description':
+                            'Save lesson flashcards and study packs from your classroom hub box so you can study offline at home.',
+                        'badge': '💾 Offline',
+                        'priority': 'routine',
+                        'actionLabel': 'Download Files',
+                        'actionType': 'open_hub',
+                      },
+                    ];
 
               final effectiveRecommendations = rawRecommendations.isNotEmpty
                   ? rawRecommendations

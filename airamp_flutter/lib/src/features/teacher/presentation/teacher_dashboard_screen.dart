@@ -2085,6 +2085,12 @@ class _TeacherDashboardScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Interactive Client Demo Sandbox Control Bar
+        const AnalyticsDemoControlBar(
+          showCampusFilter: false,
+          showSectionFilter: true,
+        ),
+
         // View switcher and filter controls
         const SizedBox(height: 12),
         if (isDesktop) ...[
@@ -3711,7 +3717,7 @@ class _TeacherDashboardScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Tier 1: Descriptive',
+                  'Gradebook Distribution',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -3906,6 +3912,8 @@ class _TeacherDashboardScreenState
     required bool isDark,
     VoidCallback? onOpenHeatmap,
   }) {
+    final demo = ref.watch(teacherDemoAnalyticsProvider);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -3933,7 +3941,7 @@ class _TeacherDashboardScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Diagnostic Analytics & Competency Drop-Off',
+                  'Class Quiz Scores & Topic Review',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -3950,7 +3958,7 @@ class _TeacherDashboardScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Tier 2: Diagnostic',
+                  'Quiz & Topic Mastery',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -3960,41 +3968,75 @@ class _TeacherDashboardScreenState
               ),
             ],
           ),
+          const SizedBox(height: 12),
+
+          // Class Quiz Turn-In Rate & Missing Work Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.assignment_turned_in_rounded, size: 18, color: AppTheme.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Quiz Turn-In Rate: 86% on Time (36 of 42 submitted)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      ),
+                      Text(
+                        '6 students have pending work or missed the last quiz deadline.',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
 
-          // Bold Full-Sized Diagnostic Bar Chart (Bloom's Cognitive Taxonomy)
+          // Assessment Trajectory Line Chart over Quizzes
+          Text(
+            'Class Average Trend (Across Quizzes & Exams)',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
+          ),
+          const SizedBox(height: 6),
+          AnalyticsMultiLineChart(
+            series: demo.classAssessmentTrajectory,
+            baselineY: 75.0,
+            baselineLabel: 'DepEd 75% Benchmark',
+            height: 165,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 16),
+
+          // Curriculum Topic Mastery Diagnosis Bar Chart
+          Text(
+            'Student Topic Mastery Breakdown',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
+          ),
+          const SizedBox(height: 6),
           AnalyticsBarChart(
-            items: const [
-              BarChartItem(
-                label: 'Remember',
-                value: 86.0,
-                color: Color(0xFF0284C7),
-              ),
-              BarChartItem(
-                label: 'Understand',
-                value: 80.0,
-                color: Color(0xFF0284C7),
-              ),
-              BarChartItem(
-                label: 'Apply',
-                value: 72.0,
-                color: Color(0xFF0D9488),
-              ),
-              BarChartItem(
-                label: 'Analyze',
-                value: 65.0,
-                color: Color(0xFFD97706),
-              ),
-              BarChartItem(
-                label: 'Evaluate',
-                value: 58.0,
-                color: Color(0xFFD97706),
-              ),
-            ],
+            items: demo.topicMasteryBars,
             baselineValue: 75.0,
             baselineLabel: 'DepEd 75%',
             valueSuffix: '%',
-            height: 190,
+            height: 175,
             isDark: isDark,
           ),
           const SizedBox(height: 12),
@@ -4027,7 +4069,7 @@ class _TeacherDashboardScreenState
                     color: AppTheme.accent,
                   ),
                   label: Text(
-                    'Competency Heatmap',
+                    'Topic Progress Grid',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -4079,7 +4121,11 @@ class _TeacherDashboardScreenState
     required bool isDark,
     required Function(String studentId) onSelectStudent,
   }) {
-    final effPassRate = forecastPassRate ?? 82;
+    final demo = ref.watch(teacherDemoAnalyticsProvider);
+    final effPassRate = forecastPassRate ?? demo.classPassRate;
+    final effectiveAtRisk = atRiskStudents.isNotEmpty
+        ? atRiskStudents
+        : demo.atRiskStudents;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -4108,7 +4154,7 @@ class _TeacherDashboardScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Class Assessment Health & Student Support',
+                  'Class Passing Estimate & Students Needing Help',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -4125,7 +4171,7 @@ class _TeacherDashboardScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Tier 3: Predictive',
+                  'Support Needed',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -4152,7 +4198,7 @@ class _TeacherDashboardScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Cohort Score Trajectory',
+                    'Class Score History & Passing Estimate',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.bold,
@@ -4162,8 +4208,9 @@ class _TeacherDashboardScreenState
                   const SizedBox(height: 6),
                   AnalyticsTrendChart(
                     points: [
-                      const TrendPoint(label: 'Assess 1', value: 72.0),
-                      const TrendPoint(label: 'Assess 2', value: 78.0),
+                      TrendPoint(label: 'Assess 1', value: (effPassRate - 6.0).clamp(40.0, 95.0)),
+                      TrendPoint(label: 'Assess 2', value: (effPassRate - 2.0).clamp(40.0, 98.0)),
+                      TrendPoint(label: 'Assess 3', value: (effPassRate + 3.0).clamp(40.0, 99.0)),
                       TrendPoint(
                         label: 'Projected',
                         value: effPassRate.toDouble(),
@@ -4249,7 +4296,7 @@ class _TeacherDashboardScreenState
           ),
           const SizedBox(height: 8),
 
-          if (atRiskStudents.isEmpty)
+          if (effectiveAtRisk.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -4287,12 +4334,14 @@ class _TeacherDashboardScreenState
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: atRiskStudents.map((st) {
+              children: effectiveAtRisk.map((st) {
                 final name = st['name'] as String? ?? 'Student';
-                final sec = st['section'] as String? ?? '';
-                final score = st['avgScore'] as int? ?? 0;
-                final reason = st['riskReason'] as String? ?? 'Needs review';
-                final studentId = st['id'] as String;
+                final sec = st['section'] as String? ?? 'Grade 10';
+                final scoreStr =
+                    st['grade']?.toString() ?? '${st['avgScore'] ?? 65}%';
+                final reason = (st['gap'] ?? st['riskReason'] ?? 'Needs review')
+                    .toString();
+                final studentId = (st['id'] ?? 'std_mock').toString();
 
                 return InkWell(
                   onTap: () => onSelectStudent(studentId),
@@ -4312,17 +4361,23 @@ class _TeacherDashboardScreenState
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: AppTheme.warning.withValues(
-                            alpha: 0.2,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFEF4444,
+                            ).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                            style: TextStyle(
-                              fontSize: 10,
+                            scoreStr,
+                            style: const TextStyle(
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: AppTheme.warning,
+                              color: Color(0xFFEF4444),
                             ),
                           ),
                         ),
@@ -4331,57 +4386,22 @@ class _TeacherDashboardScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                                if (sec.isNotEmpty) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '($sec)',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
                             ),
                             Text(
-                              reason,
+                              '$sec • Gap: $reason',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: AppTheme.warning,
-                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.warning.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$score%',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.warning,
-                            ),
-                          ),
                         ),
                       ],
                     ),

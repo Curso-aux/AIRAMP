@@ -5,4 +5,7 @@ export 'analytics_lollipop_chart.dart';
 export 'analytics_trend_chart.dart';
 export 'analytics_radar_chart.dart';
 export 'analytics_gauge_meter.dart';
+export 'analytics_multi_line_chart.dart';
+export 'analytics_demo_engine.dart';
+export 'analytics_demo_control_bar.dart';
 export 'prescriptive_action_card.dart';

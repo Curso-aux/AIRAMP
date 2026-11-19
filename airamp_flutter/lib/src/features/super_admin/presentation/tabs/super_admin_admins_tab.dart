@@ -275,8 +275,9 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                     'evangelistachristian88@gmail.com')
                             ? null
                             : (val) {
-                                if (val != null)
+                                if (val != null) {
                                   setDialogState(() => selectedRole = val);
+                                }
                               },
                       ),
                       const SizedBox(height: 14),
@@ -336,8 +337,9 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                             }),
                           ],
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setDialogState(() => selectedSchool = val);
+                            }
                           },
                         ),
                     ],

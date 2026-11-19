@@ -28,6 +28,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     final schools = ref.watch(schoolsListProvider);
     final admins = ref.watch(schoolAdminsProvider);
     final currentUser = ref.watch(authProvider);
+    final demoAnalytics = ref.watch(superAdminDemoAnalyticsProvider);
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < 600;
@@ -42,7 +43,13 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         children: [
               // ── Formal Institutional Header ──
               _buildExecutiveBanner(context, gTheme, currentUser),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
+
+              // ── Interactive Demo Sandbox Control Bar ──
+              const AnalyticsDemoControlBar(
+                showCampusFilter: true,
+                showSectionFilter: false,
+              ),
 
               // ── Key Governance Metrics (4 Cards) ──
               statsAsync.when(
@@ -64,7 +71,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                     style: TextStyle(color: gTheme.dangerText),
                   ),
                 ),
-                data: (stats) => _buildMetricsGrid(context, gTheme, stats),
+                data: (stats) => _buildMetricsGrid(context, gTheme, stats, demoAnalytics),
               ),
               const SizedBox(height: 24),
 
@@ -76,7 +83,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               statsAsync.maybeWhen(
                 data: (stats) => Column(
                   children: [
-                    _buildDivisionFourTierCard(context, gTheme, stats, schools),
+                    _buildDivisionFourTierCard(context, gTheme, stats, schools, demoAnalytics),
                     const SizedBox(height: 28),
                   ],
                 ),
@@ -114,7 +121,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Global multi-tenant network. Inspect any institutional campus with scoped jurisdiction.',
+                        'All registered school campuses. Click any school to view its classrooms and teachers.',
                         style: TextStyle(
                           fontSize: 13,
                           color: gTheme.textSecondary,
@@ -361,12 +368,17 @@ class SuperAdminOverviewTab extends ConsumerWidget {
   Widget _buildMetricsGrid(
     BuildContext context,
     GovernanceTheme gTheme,
-    Map<String, dynamic> stats,
-  ) {
-    final totalSchools = (stats['total_schools'] as num?)?.toInt() ?? 1;
-    final totalAdmins = (stats['total_admins'] as num?)?.toInt() ?? 2;
-    final totalTeachers = (stats['total_teachers'] as num?)?.toInt() ?? 0;
-    final totalStudents = (stats['total_students'] as num?)?.toInt() ?? 0;
+    Map<String, dynamic> stats, [
+    SuperAdminDemoAnalytics? demoAnalytics,
+  ]) {
+    final rawSchools = (stats['total_schools'] as num?)?.toInt() ?? 0;
+    final totalSchools = rawSchools > 0 ? rawSchools : (demoAnalytics?.totalCampuses ?? 1);
+    final rawAdmins = (stats['total_admins'] as num?)?.toInt() ?? 0;
+    final totalAdmins = demoAnalytics?.totalAdmins ?? (rawAdmins > 0 ? rawAdmins : 2);
+    final rawTeachers = (stats['total_teachers'] as num?)?.toInt() ?? 0;
+    final totalTeachers = demoAnalytics?.totalTeachers ?? (rawTeachers > 0 ? rawTeachers : 0);
+    final rawStudents = (stats['total_students'] as num?)?.toInt() ?? 0;
+    final totalStudents = demoAnalytics?.totalStudents ?? (rawStudents > 0 ? rawStudents : 0);
 
     final items = [
       _MetricTileData(
@@ -383,10 +395,10 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         value: '$totalAdmins',
         icon: Icons.admin_panel_settings_outlined,
         tag:
-            '${stats['school_admins'] ?? 0} School • ${stats['super_admins'] ?? 0} Super',
+            '${stats['school_admins'] ?? (totalAdmins > 2 ? totalAdmins - 2 : 1)} School • ${stats['super_admins'] ?? 2} Super',
         color: const Color(0xFF6366F1),
         sparkline: [2.0, 3.0, 4.0, (totalAdmins > 4 ? totalAdmins - 1 : 4).toDouble(), totalAdmins.toDouble()],
-        progress: (totalAdmins / 10.0).clamp(0.2, 1.0),
+        progress: (totalAdmins / 20.0).clamp(0.2, 1.0),
       ),
       _MetricTileData(
         label: 'Active Faculty Teachers',
@@ -395,16 +407,16 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         tag: 'Across All Campuses',
         color: const Color(0xFF0EA5E9),
         sparkline: [1.0, 2.0, 2.0, (totalTeachers > 2 ? totalTeachers - 1 : 3).toDouble(), totalTeachers.toDouble()],
-        progress: (totalTeachers / 12.0).clamp(0.15, 1.0),
+        progress: (totalTeachers / 80.0).clamp(0.15, 1.0),
       ),
       _MetricTileData(
         label: 'Enrolled Students',
         value: '$totalStudents',
         icon: Icons.people_outline_rounded,
-        tag: '${stats['total_sections'] ?? 0} Class Sections',
+        tag: '${stats['total_sections'] ?? 18} Class Sections',
         color: const Color(0xFF10B981),
         sparkline: [2.0, 4.0, 5.0, (totalStudents > 5 ? totalStudents - 1 : 6).toDouble(), totalStudents.toDouble()],
-        progress: (totalStudents / 25.0).clamp(0.1, 1.0),
+        progress: (totalStudents / 2000.0).clamp(0.1, 1.0),
       ),
     ];
 
@@ -944,7 +956,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Jurisdiction overview: each academic campus operates under an isolated administrator scope.',
+                      'Campus overview: Each school campus is managed by its own assigned school administrator.',
                       style: TextStyle(
                         fontSize: 12,
                         color: gTheme.textSecondary,
@@ -1050,16 +1062,15 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     GovernanceTheme gTheme,
     Map<String, dynamic> stats,
     List<Map<String, dynamic>> schools,
+    SuperAdminDemoAnalytics demoAnalytics,
   ) {
-    final totalSchools = (stats['total_schools'] as int?) ?? schools.length;
-    final totalStudents = (stats['total_students'] as int?) ?? 0;
-    final totalTeachers = (stats['total_teachers'] as int?) ?? 0;
-    final totalHubs = (stats['total_hubs'] as int?) ?? 0;
-    final totalSubjects = (stats['total_subjects'] as int?) ?? 0;
-    final totalAdmins = (stats['total_admins'] as int?) ?? 0;
-    final studentTeacherRatio = totalTeachers > 0
-        ? (totalStudents / totalTeachers).toStringAsFixed(1)
-        : 'N/A';
+    final totalSchools = schools.isNotEmpty ? schools.length : demoAnalytics.totalCampuses;
+    final totalStudents = demoAnalytics.totalStudents;
+    final totalTeachers = demoAnalytics.totalTeachers;
+    final totalHubs = demoAnalytics.totalHubNodes;
+    final totalSubjects = (stats['total_subjects'] as int?) ?? 14;
+    final totalAdmins = demoAnalytics.totalAdmins;
+    final studentTeacherRatio = demoAnalytics.studentTeacherRatio;
     final hubCoverageRatio = totalSchools > 0
         ? (totalHubs / totalSchools).toStringAsFixed(1)
         : '0.0';
@@ -1099,7 +1110,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Multi-Campus 4-Tier Governance Analytics Framework',
+                      'All-Campuses Performance Overview',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1108,7 +1119,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Division-wide oversight across historical footprint, cross-campus disparities, capacity forecast, and resource directives',
+                      'Compare student counts, teacher numbers, passing rates, and needed support across all your schools.',
                       style: TextStyle(
                         fontSize: 12,
                         color: gTheme.textSecondary,
@@ -1119,6 +1130,46 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          // At-a-Glance Campus Highlights Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: gTheme.primarySubtle.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: gTheme.primaryBorder.withValues(alpha: 0.6)),
+            ),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🏆', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Top Performing: Main Campus (${demoAnalytics.overallPassRate + 4}% Pass Rate)',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('⚠️', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Needs Support: North Campus (Ratio $studentTeacherRatio:1 — target is 25:1)',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: gTheme.warningText),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
 
           // 4-Tier Responsive Grid
@@ -1128,9 +1179,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
 
               final tier1 = _buildSuperTierTile(
                 gTheme: gTheme,
-                tierBadge: 'Tier 1: Descriptive',
+                tierBadge: 'Step 1: School Headcount',
                 tierColor: gTheme.primary,
-                friendlyTitle: 'Division Network Aggregate Footprint',
+                friendlyTitle: 'Total Students & Teachers Across Campuses',
                 icon: Icons.domain_verification_rounded,
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1143,6 +1194,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                         _buildSuperMetricChip(gTheme, 'Courses', '$totalSubjects'),
                         _buildSuperMetricChip(gTheme, 'Learners', '$totalStudents'),
                         _buildSuperMetricChip(gTheme, 'Faculty', '$totalTeachers'),
+                        _buildSuperMetricChip(gTheme, 'Admins', '$totalAdmins'),
                         _buildSuperMetricChip(gTheme, 'ESP32 Nodes', '$totalHubs'),
                       ],
                     ),
@@ -1151,24 +1203,10 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       builder: (context, constraints) {
                         final isCompact = constraints.maxWidth < 450;
                         final barChart = AnalyticsBarChart(
-                          items: schools.map((sch) {
-                            final name = (sch['code'] as String? ?? sch['name'] as String? ?? 'Campus').trim();
-                            final sId = sch['id']?.toString() ?? '';
-                            final campusStudents = sId == 'sch_main'
-                                ? totalStudents.toDouble()
-                                : (totalStudents / (schools.isNotEmpty ? schools.length : 1)).roundToDouble();
-                            final campusFaculty = (totalTeachers / (schools.isNotEmpty ? schools.length : 1)).roundToDouble();
-                            return BarChartItem(
-                              label: name.length > 9 ? name.substring(0, 9) : name,
-                              value: campusStudents > 0 ? campusStudents : 1.0,
-                              secondaryValue: campusFaculty > 0 ? campusFaculty : 1.0,
-                              color: gTheme.primary,
-                              secondaryColor: const Color(0xFF0EA5E9),
-                              tooltip: '${sch['name']}: ${campusStudents.toInt()} students, ${campusFaculty.toInt()} faculty',
-                            );
-                          }).toList(),
+                          items: demoAnalytics.campusComparisonBars,
                           legend: 'Learners',
                           secondaryLegend: 'Faculty',
+                          tertiaryLegend: 'Staff',
                           valueSuffix: '',
                           height: 210,
                           isDark: gTheme.isDark,
@@ -1189,7 +1227,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                             DonutSegment(
                               label: 'Admins',
                               value: totalAdmins.toDouble() > 0 ? totalAdmins.toDouble() : 1.0,
-                              color: const Color(0xFF6366F1),
+                              color: const Color(0xFF8B5CF6),
                             ),
                           ],
                           centerText: '${totalStudents + totalTeachers + totalAdmins}',
@@ -1217,15 +1255,59 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                         );
                       },
                     ),
+                    const SizedBox(height: 20),
+
+                    // Multi-Line Time-Series Chart for Network Growth Over Time
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: gTheme.isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: gTheme.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.show_chart_rounded, size: 16, color: gTheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Monthly Student Count & Quizzes Taken Over Time',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: gTheme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Track how student enrollment and quiz attempts grow month-by-month.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: gTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          AnalyticsMultiLineChart(
+                            series: demoAnalytics.networkGrowthSeries,
+                            height: 170,
+                            isDark: gTheme.isDark,
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
 
               final tier2 = _buildSuperTierTile(
                 gTheme: gTheme,
-                tierBadge: 'Tier 2: Diagnostic',
+                tierBadge: 'Step 2: Teacher Workload',
                 tierColor: const Color(0xFF0EA5E9),
-                friendlyTitle: 'Campus Equipment & Resource Comparison',
+                friendlyTitle: 'Classroom & Teacher Workload Check',
                 icon: Icons.troubleshoot_rounded,
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1235,8 +1317,8 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       runSpacing: 6,
                       children: [
                         _buildSuperMetricChip(gTheme, 'Student-Teacher Ratio', '$studentTeacherRatio : 1'),
-                        _buildSuperMetricChip(gTheme, 'Storage Hubs', '$hubCoverageRatio / Campus'),
-                        _buildSuperMetricChip(gTheme, 'Offline Sync', 'Auto Local Sync'),
+                        _buildSuperMetricChip(gTheme, 'Classroom Hub Boxes', '$hubCoverageRatio / Campus'),
+                        _buildSuperMetricChip(gTheme, 'Offline Auto-Sync', 'Active'),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -1298,9 +1380,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
 
               final tier3 = _buildSuperTierTile(
                 gTheme: gTheme,
-                tierBadge: 'Tier 3: Predictive',
+                tierBadge: 'Step 3: Exam Forecast',
                 tierColor: gTheme.warningText,
-                friendlyTitle: 'Student Achievement & Storage Forecast',
+                friendlyTitle: 'Estimated Passing Rates & Storage',
                 icon: Icons.trending_up_rounded,
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1309,20 +1391,20 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                     Row(
                       children: [
                         AnalyticsGaugeMeter(
-                          value: 81.4,
+                          value: demoAnalytics.overallPassRate.toDouble(),
                           label: 'Estimated Pass',
-                          statusText: 'Optimal',
+                          statusText: demoAnalytics.overallPassRate >= 80 ? 'Optimal' : (demoAnalytics.overallPassRate >= 70 ? 'Satisfactory' : 'Needs Support'),
                           size: 165,
                           isDark: gTheme.isDark,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: AnalyticsTrendChart(
-                            points: const [
-                              TrendPoint(label: 'Sem 1', value: 76.0),
-                              TrendPoint(label: 'Sem 2', value: 79.0),
-                              TrendPoint(label: 'Current', value: 81.4),
-                              TrendPoint(label: 'Forecast', value: 84.0),
+                            points: [
+                              TrendPoint(label: 'Sem 1', value: (demoAnalytics.overallPassRate - 8.0).clamp(50.0, 95.0)),
+                              TrendPoint(label: 'Sem 2', value: (demoAnalytics.overallPassRate - 4.0).clamp(50.0, 98.0)),
+                              TrendPoint(label: 'Current', value: demoAnalytics.overallPassRate.toDouble()),
+                              TrendPoint(label: 'Forecast', value: (demoAnalytics.overallPassRate + 3.0).clamp(50.0, 100.0)),
                             ],
                             height: 200,
                             baselineY: 75.0,
@@ -1338,9 +1420,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        _buildSuperMetricChip(gTheme, 'Estimated Pass Rate', '81.4%'),
+                        _buildSuperMetricChip(gTheme, 'Estimated Pass Rate', '${demoAnalytics.overallPassRate}%'),
                         _buildSuperMetricChip(gTheme, 'Storage Capacity', '~75 Days Left'),
-                        _buildSuperMetricChip(gTheme, 'Sync Reliability', '94.2%'),
+                        _buildSuperMetricChip(gTheme, 'Sync Reliability', '95.8%'),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1357,7 +1439,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Predictive Risk: Division mastery is trending +5.4% above DepEd threshold. Storage growth is stable across satellite nodes.',
+                              'Passing Forecast: Student quiz scores are 5.4% above passing target. Classroom hub storage is in good shape.',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
@@ -1374,9 +1456,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
 
               final tier4 = _buildSuperTierTile(
                 gTheme: gTheme,
-                tierBadge: 'Tier 4: Action Plan',
+                tierBadge: 'Step 4: School Action Plan',
                 tierColor: gTheme.successText,
-                friendlyTitle: 'Recommended Next Steps & Campus Support',
+                friendlyTitle: 'Recommended Next Steps for Schools',
                 icon: Icons.policy_rounded,
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

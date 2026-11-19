@@ -6,16 +6,20 @@ class BarChartItem {
   final String label;
   final double value;
   final double? secondaryValue;
+  final double? tertiaryValue;
   final Color? color;
   final Color? secondaryColor;
+  final Color? tertiaryColor;
   final String? tooltip;
 
   const BarChartItem({
     required this.label,
     required this.value,
     this.secondaryValue,
+    this.tertiaryValue,
     this.color,
     this.secondaryColor,
+    this.tertiaryColor,
     this.tooltip,
   });
 }
@@ -31,8 +35,10 @@ class AnalyticsBarChart extends StatefulWidget {
   final bool showValues;
   final Color? primaryBarColor;
   final Color? secondaryBarColor;
+  final Color? tertiaryBarColor;
   final String? legend;
   final String? secondaryLegend;
+  final String? tertiaryLegend;
 
   const AnalyticsBarChart({
     super.key,
@@ -46,8 +52,10 @@ class AnalyticsBarChart extends StatefulWidget {
     this.showValues = true,
     this.primaryBarColor,
     this.secondaryBarColor,
+    this.tertiaryBarColor,
     this.legend,
     this.secondaryLegend,
+    this.tertiaryLegend,
   });
 
   @override
@@ -60,10 +68,10 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
   double _computeEffectiveMax() {
     if (widget.items.isEmpty) return 100.0;
     final maxDataVal = widget.items.map((e) {
-      if (e.secondaryValue != null) {
-        return math.max(e.value, e.secondaryValue!);
-      }
-      return e.value;
+      double m = e.value;
+      if (e.secondaryValue != null) m = math.max(m, e.secondaryValue!);
+      if (e.tertiaryValue != null) m = math.max(m, e.tertiaryValue!);
+      return m;
     }).reduce(math.max);
 
     if (widget.maxValue != null && widget.maxValue! > 0) {
@@ -102,6 +110,7 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
     final effectiveMax = _computeEffectiveMax();
     final defaultPrimary = widget.primaryBarColor ?? (widget.isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary);
     final defaultSecondary = widget.secondaryBarColor ?? (widget.isDark ? AppTheme.darkAccent : AppTheme.lightAccent);
+    final defaultTertiary = widget.tertiaryBarColor ?? const Color(0xFF8B5CF6);
     final trackColor = widget.isDark ? AppTheme.darkBorder.withValues(alpha: 0.35) : AppTheme.lightBorder.withValues(alpha: 0.5);
     final textColor = widget.isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
     final gridLineColor = widget.isDark ? AppTheme.darkBorder.withValues(alpha: 0.3) : AppTheme.lightBorder.withValues(alpha: 0.6);
@@ -155,6 +164,30 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
                           Flexible(
                             child: Text(
                               widget.secondaryLegend!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: textColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (widget.tertiaryLegend != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: defaultTertiary,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              widget.tertiaryLegend!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -257,22 +290,28 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
 
                           final activeColor = item.color ?? defaultPrimary;
                           final hasSecondary = item.secondaryValue != null;
+                          final hasTertiary = item.tertiaryValue != null;
                           final secVal = (item.secondaryValue ?? 0.0).clamp(0.0, effectiveMax);
                           final secPct = effectiveMax > 0 ? (secVal / effectiveMax).clamp(0.02, 1.0) : 0.02;
                           final secActiveColor = item.secondaryColor ?? defaultSecondary;
+                          final tertVal = (item.tertiaryValue ?? 0.0).clamp(0.0, effectiveMax);
+                          final tertPct = effectiveMax > 0 ? (tertVal / effectiveMax).clamp(0.02, 1.0) : 0.02;
+                          final tertActiveColor = item.tertiaryColor ?? defaultTertiary;
 
                           return Expanded(
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: isFewItems ? 8.0 : 3.0),
+                              padding: EdgeInsets.symmetric(horizontal: isFewItems ? 8.0 : (hasTertiary ? 2.0 : 3.0)),
                               child: MouseRegion(
                                 onEnter: (_) => setState(() => _hoveredIndex = i),
                                 onExit: (_) => setState(() => _hoveredIndex = null),
                                 cursor: SystemMouseCursors.click,
                                 child: Tooltip(
                                   message: item.tooltip ??
-                                      (hasSecondary
-                                          ? '${item.label}: ${item.value.toStringAsFixed(0)} / ${item.secondaryValue!.toStringAsFixed(0)}'
-                                          : '${item.label}: ${item.value.toStringAsFixed(1)}${widget.valueSuffix ?? ''}'),
+                                      (hasTertiary
+                                          ? '${item.label}: ${item.value.toStringAsFixed(0)} / ${item.secondaryValue!.toStringAsFixed(0)} / ${item.tertiaryValue!.toStringAsFixed(0)}'
+                                          : (hasSecondary
+                                              ? '${item.label}: ${item.value.toStringAsFixed(0)} / ${item.secondaryValue!.toStringAsFixed(0)}'
+                                              : '${item.label}: ${item.value.toStringAsFixed(1)}${widget.valueSuffix ?? ''}')),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
@@ -309,7 +348,7 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
                                       Expanded(
                                         child: Align(
                                           alignment: Alignment.bottomCenter,
-                                          child: !hasSecondary
+                                          child: (!hasSecondary && !hasTertiary)
                                               ? Container(
                                                   width: barThickness,
                                                   alignment: Alignment.bottomCenter,
@@ -345,67 +384,136 @@ class _AnalyticsBarChartState extends State<AnalyticsBarChart> {
                                                     ),
                                                   ),
                                                 )
-                                              : Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                                  children: [
-                                                    // Primary Bar
-                                                    Container(
-                                                      width: barThickness * 0.48,
-                                                      alignment: Alignment.bottomCenter,
-                                                      decoration: BoxDecoration(
-                                                        color: trackColor,
-                                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                                      ),
-                                                      child: FractionallySizedBox(
-                                                        heightFactor: pct,
-                                                        alignment: Alignment.bottomCenter,
-                                                        child: Container(
-                                                          width: double.infinity,
+                                              : hasTertiary
+                                                  ? Row(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                                      children: [
+                                                        // Bar 1 (Primary)
+                                                        Container(
+                                                          width: math.max(barThickness * 0.28, 5.0),
+                                                          alignment: Alignment.bottomCenter,
                                                           decoration: BoxDecoration(
-                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                                            gradient: LinearGradient(
-                                                              begin: Alignment.bottomCenter,
-                                                              end: Alignment.topCenter,
-                                                              colors: [
-                                                                activeColor.withValues(alpha: 0.8),
-                                                                activeColor,
-                                                              ],
+                                                            color: trackColor,
+                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: pct,
+                                                            alignment: Alignment.bottomCenter,
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                                color: activeColor,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    // Secondary Bar
-                                                    Container(
-                                                      width: barThickness * 0.48,
-                                                      alignment: Alignment.bottomCenter,
-                                                      decoration: BoxDecoration(
-                                                        color: trackColor,
-                                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                                      ),
-                                                      child: FractionallySizedBox(
-                                                        heightFactor: secPct,
-                                                        alignment: Alignment.bottomCenter,
-                                                        child: Container(
-                                                          width: double.infinity,
+                                                        const SizedBox(width: 2),
+                                                        // Bar 2 (Secondary)
+                                                        Container(
+                                                          width: math.max(barThickness * 0.28, 5.0),
+                                                          alignment: Alignment.bottomCenter,
                                                           decoration: BoxDecoration(
-                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                                            gradient: LinearGradient(
-                                                              begin: Alignment.bottomCenter,
-                                                              end: Alignment.topCenter,
-                                                              colors: [
-                                                                secActiveColor.withValues(alpha: 0.8),
-                                                                secActiveColor,
-                                                              ],
+                                                            color: trackColor,
+                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: secPct,
+                                                            alignment: Alignment.bottomCenter,
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                                color: secActiveColor,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
-                                                      ),
+                                                        const SizedBox(width: 2),
+                                                        // Bar 3 (Tertiary)
+                                                        Container(
+                                                          width: math.max(barThickness * 0.28, 5.0),
+                                                          alignment: Alignment.bottomCenter,
+                                                          decoration: BoxDecoration(
+                                                            color: trackColor,
+                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: tertPct,
+                                                            alignment: Alignment.bottomCenter,
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                                                color: tertActiveColor,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : Row(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                                      children: [
+                                                        // Primary Bar
+                                                        Container(
+                                                          width: barThickness * 0.48,
+                                                          alignment: Alignment.bottomCenter,
+                                                          decoration: BoxDecoration(
+                                                            color: trackColor,
+                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: pct,
+                                                            alignment: Alignment.bottomCenter,
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                                                gradient: LinearGradient(
+                                                                  begin: Alignment.bottomCenter,
+                                                                  end: Alignment.topCenter,
+                                                                  colors: [
+                                                                    activeColor.withValues(alpha: 0.8),
+                                                                    activeColor,
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        // Secondary Bar
+                                                        Container(
+                                                          width: barThickness * 0.48,
+                                                          alignment: Alignment.bottomCenter,
+                                                          decoration: BoxDecoration(
+                                                            color: trackColor,
+                                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                                          ),
+                                                          child: FractionallySizedBox(
+                                                            heightFactor: secPct,
+                                                            alignment: Alignment.bottomCenter,
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              decoration: BoxDecoration(
+                                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                                                gradient: LinearGradient(
+                                                                  begin: Alignment.bottomCenter,
+                                                                  end: Alignment.topCenter,
+                                                                  colors: [
+                                                                    secActiveColor.withValues(alpha: 0.8),
+                                                                    secActiveColor,
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ],
-                                                ),
                                         ),
                                       ),
 

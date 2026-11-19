@@ -59,8 +59,9 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
     final courses = ref.watch(studentCoursesProvider);
     final progress = ref.watch(studentProgressProvider);
     final quizzes = ref.watch(studentQuizAssignmentsProvider);
+    final demoStudent = ref.watch(studentDemoAnalyticsProvider);
 
-    final activeCourses = courses.length;
+    final activeCourses = courses.isNotEmpty ? courses.length : demoStudent.activeCourses;
     final lessonsDone = progress['completed'] ?? 0;
     final pending = progress['pending'] ?? 0;
     final total = lessonsDone + pending;
@@ -205,6 +206,13 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Interactive Client Demo Sandbox Control Bar
+                  const AnalyticsDemoControlBar(
+                    showCampusFilter: false,
+                    showSectionFilter: false,
+                    showSubjectFilter: true,
+                  ),
+
                   // Four-Tier Analytics Switcher: My Record, Strengths, Expected Grade, Next Steps
                   Container(
                     padding: const EdgeInsets.all(3),
@@ -576,12 +584,12 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
     }).toList();
 
     final radarDims = const [
-      RadarDimension(label: 'Remembering', value: 80.0),
-      RadarDimension(label: 'Understanding', value: 75.0),
-      RadarDimension(label: 'Applying', value: 70.0),
-      RadarDimension(label: 'Analyzing', value: 65.0),
-      RadarDimension(label: 'Evaluating', value: 60.0),
-      RadarDimension(label: 'Creating', value: 58.0),
+      RadarDimension(label: 'Recalling Facts', value: 80.0),
+      RadarDimension(label: 'Understanding Lessons', value: 75.0),
+      RadarDimension(label: 'Solving Problems', value: 70.0),
+      RadarDimension(label: 'Connecting Ideas', value: 65.0),
+      RadarDimension(label: 'Checking & Judging', value: 60.0),
+      RadarDimension(label: 'Creative Projects', value: 58.0),
     ];
 
     return Column(
@@ -701,12 +709,12 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
             child: AnalyticsRadarChart(
               dimensions: radarDims,
               secondaryDimensions: const [
-                RadarDimension(label: 'Remembering', value: 75.0),
-                RadarDimension(label: 'Understanding', value: 75.0),
-                RadarDimension(label: 'Applying', value: 75.0),
-                RadarDimension(label: 'Analyzing', value: 75.0),
-                RadarDimension(label: 'Evaluating', value: 75.0),
-                RadarDimension(label: 'Creating', value: 75.0),
+                RadarDimension(label: 'Recalling Facts', value: 75.0),
+                RadarDimension(label: 'Understanding Lessons', value: 75.0),
+                RadarDimension(label: 'Solving Problems', value: 75.0),
+                RadarDimension(label: 'Connecting Ideas', value: 75.0),
+                RadarDimension(label: 'Checking & Judging', value: 75.0),
+                RadarDimension(label: 'Creative Projects', value: 75.0),
               ],
               size: isDesktop ? 220 : 190,
               isDark: isDark,
@@ -717,6 +725,24 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
               secondaryLegend: 'Passing Mark (75%)',
             ),
           ),
+        const SizedBox(height: 18),
+        Text(
+          'Subject Mastery Breakdown',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+          ),
+        ),
+        const SizedBox(height: 8),
+        AnalyticsBarChart(
+          items: ref.watch(studentDemoAnalyticsProvider).subjectMasteryBars,
+          baselineValue: 75.0,
+          baselineLabel: 'Passing (75%)',
+          valueSuffix: '%',
+          height: 160,
+          isDark: isDark,
+        ),
       ],
     );
   }
@@ -733,12 +759,60 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
     bool isDark,
     bool isDesktop,
   ) {
+    final demoStudent = ref.watch(studentDemoAnalyticsProvider);
+    final effLessonsDone = lessonsDone > 0 ? lessonsDone : (demoStudent.overallGrade >= 75 ? 9 : 5);
+    final effPending = pending > 0 ? pending : (demoStudent.overallGrade >= 75 ? 3 : 7);
+    final effTotal = effLessonsDone + effPending;
+    final effCompletionPct = effTotal > 0 ? ((effLessonsDone / effTotal) * 100).round() : 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildOverviewCardsView(activeCourses, lessonsDone, pending, completionPct, isDark, isDesktop),
+        _buildOverviewCardsView(activeCourses, effLessonsDone, effPending, effCompletionPct, isDark, isDesktop),
         const SizedBox(height: 18),
-        _buildDonutChartView(activeCourses, lessonsDone, pending, isDark),
+        _buildDonutChartView(activeCourses, effLessonsDone, effPending, isDark),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.show_chart_rounded, size: 16, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'My Score History & Assessment Trajectory',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Track your quiz grades across the term compared against the 75% passing benchmark.',
+                style: TextStyle(fontSize: 11, color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 12),
+              AnalyticsTrendChart(
+                points: demoStudent.myScoreHistory,
+                baselineY: 75.0,
+                baselineLabel: 'Passing Mark (75%)',
+                height: 155,
+                isDark: isDark,
+                lineColor: const Color(0xFF0D9488),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
